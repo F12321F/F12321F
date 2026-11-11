@@ -20,6 +20,19 @@
   let client;
   let submitting = false;
   let loadVersion = 0;
+  let cachedRequests = [];
+  let activeFilter = "全部";
+  const filters = document.getElementById("urgency-filters");
+
+  filters.addEventListener("click", function (event) {
+    const button = event.target.closest("button[data-filter]");
+    if (!button || !filters.contains(button)) return;
+    activeFilter = button.dataset.filter;
+    filters.querySelectorAll("button").forEach(function (item) {
+      item.setAttribute("aria-pressed", String(item === button));
+    });
+    renderRequests(cachedRequests);
+  });
 
   function showMessage(element, message, kind) {
     element.textContent = message;
@@ -28,20 +41,28 @@
   }
 
   function errorText(error) {
+    if (error && error.code === "42501") return "資料庫權限不足，請確認 GRANT 與 RLS 設定。";
+    if (error && ["PGRST204", "PGRST205", "42703", "42P01"].includes(error.code)) {
+      return "資料表或欄位不符，請確認已套用 supabase/schema.sql，欄位包含 reporter_name 與 urgency。";
+    }
+    if (error && error.code === "23514") return "資料不符合欄位限制，請檢查類別、緊急程度與文字長度。";
     return error && error.message ? error.message : "無法連線，請檢查網路後再試一次。";
   }
 
   function renderRequests(requests) {
+    requests = activeFilter === "全部" ? requests : requests.filter(function (request) {
+      return request.urgency === activeFilter;
+    });
     const fragment = document.createDocumentFragment();
     requests.forEach(function (request) {
       const item = template.content.cloneNode(true);
-      ["category", "location", "description", "requester_name"].forEach(function (key) {
+      ["category", "location", "description", "reporter_name", "status"].forEach(function (key) {
         // 資料庫內容只作為純文字顯示，避免執行使用者輸入的 HTML。
         item.querySelector('[data-field="' + key + '"]').textContent = request[key] || "—";
       });
-      const priority = item.querySelector('[data-field="priority"]');
-      priority.textContent = "緊急程度：" + (request.priority || "—");
-      priority.dataset.level = priorities.includes(request.priority) ? request.priority : "";
+      const urgency = item.querySelector('[data-field="urgency"]');
+      urgency.textContent = "緊急程度：" + (request.urgency || "—");
+      urgency.dataset.level = priorities.includes(request.urgency) ? request.urgency : "";
       const time = item.querySelector("time");
       const date = request.created_at ? new Date(request.created_at) : new Date(NaN);
       if (Number.isNaN(date.getTime())) {
@@ -54,7 +75,9 @@
     });
     list.replaceChildren(fragment);
     count.textContent = String(requests.length);
-    emptyState.textContent = "目前還沒有報修紀錄。填寫上方表單，建立第一筆報修。";
+    emptyState.textContent = activeFilter === "全部"
+      ? "目前還沒有報修紀錄。填寫上方表單，建立第一筆報修。"
+      : "最近 20 筆中沒有「" + activeFilter + "」緊急程度的報修。";
     emptyState.hidden = requests.length > 0;
   }
 
@@ -66,12 +89,14 @@
     showMessage(listMessage, "正在載入報修紀錄…", "info");
     try {
       const result = await client.from("repair_requests")
-        .select("id,requester_name,location,category,description,priority,created_at")
+        .select("id,reporter_name,location,category,description,urgency,status,created_at")
         .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(20);
       if (version !== loadVersion) return;
       if (result.error) throw result.error;
-      renderRequests(result.data || []);
+      cachedRequests = result.data || [];
+      renderRequests(cachedRequests);
       showMessage(listMessage, "", "info");
     } catch (error) {
       if (version !== loadVersion) return;
@@ -90,14 +115,14 @@
     const data = new FormData(form);
     // 只送出表單欄位；status、created_at 交由資料庫預設值處理。
     const request = {
-      requester_name: String(data.get("requester_name") || "").trim(),
+      reporter_name: String(data.get("reporter_name") || "").trim(),
       location: String(data.get("location") || "").trim(),
       category: String(data.get("category") || ""),
       description: String(data.get("description") || "").trim(),
-      priority: String(data.get("priority") || "")
+      urgency: String(data.get("urgency") || "")
     };
-    if (!request.requester_name || !request.location || !request.description ||
-        !categories.includes(request.category) || !priorities.includes(request.priority)) {
+    if (!request.reporter_name || !request.location || !request.description ||
+        !categories.includes(request.category) || !priorities.includes(request.urgency)) {
       showMessage(formMessage, "請完整填寫所有欄位，內容不能只有空白。", "error");
       return;
     }
@@ -134,6 +159,10 @@
   }
   if (!window.supabase || typeof window.supabase.createClient !== "function") {
     showMessage(formMessage, "Supabase 程式庫載入失敗。請確認網路連線後重新整理頁面。", "error");
+    return;
+  }
+  if (!/^sb_publishable_/.test(config.publishableKey)) {
+    showMessage(formMessage, "請使用 Supabase 的公開 Publishable Key（sb_publishable_ 開頭），不要使用 secret 或 service_role 金鑰。", "error");
     return;
   }
   try {

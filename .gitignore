@@ -2,3 +2,5 @@
 tmp/
 temp/
 config.js
+dist/
+node_modules/

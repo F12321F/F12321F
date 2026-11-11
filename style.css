@@ -32,21 +32,21 @@ h1 { font-size: clamp(30px, 5vw, 42px); line-height: 1.35; letter-spacing: -.04e
 h2 { font-size: 21px; letter-spacing: -.03em; margin: 0; }
 .muted { color: var(--muted); }
 .small { font-size: 12px; }
-.form-fields, .priority-field { border: 0; margin: 0; padding: 0; min-width: 0; }
+.form-fields, .urgency-field { border: 0; margin: 0; padding: 0; min-width: 0; }
 .form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 22px 26px; }
 .field { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
-.field > label, .priority-field > legend { font-size: 13px; font-weight: 600; }
+.field > label, .urgency-field > legend { font-size: 13px; font-weight: 600; }
 input:not([type="radio"]), select, textarea { width: 100%; border: 1px solid #d7dfda; border-radius: 8px; color: #233d3a; background: #fcfdfc; padding: 11px 13px; font-size: 14px; }
 input::placeholder, textarea::placeholder { color: #8a9791; }
 textarea { resize: vertical; min-height: 115px; }
 .full-width { grid-column: 1 / -1; }
-.priority-field > legend { padding: 0; margin-bottom: 8px; }
-.priority-options { display: flex; align-items: center; gap: 9px; }
-.priority-options label { flex: 1; position: relative; }
-.priority-options input { position: absolute; opacity: 0; width: 1px; height: 1px; }
-.priority-options span { display: block; text-align: center; border: 1px solid var(--border); padding: 10px; border-radius: 8px; font-size: 14px; cursor: pointer; }
-.priority-options input:checked + span { background: #eaf4ef; border-color: var(--accent); color: var(--accent); font-weight: 700; }
-.priority-options input:focus-visible + span { outline: 3px solid #74b6a5; outline-offset: 3px; }
+.urgency-field > legend { padding: 0; margin-bottom: 8px; }
+.urgency-options { display: flex; align-items: center; gap: 9px; }
+.urgency-options label { flex: 1; position: relative; }
+.urgency-options input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.urgency-options span { display: block; text-align: center; border: 1px solid var(--border); padding: 10px; border-radius: 8px; font-size: 14px; cursor: pointer; }
+.urgency-options input:checked + span { background: #eaf4ef; border-color: var(--accent); color: var(--accent); font-weight: 700; }
+.urgency-options input:focus-visible + span { outline: 3px solid #74b6a5; outline-offset: 3px; }
 .form-footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; margin-top: 24px; padding-top: 23px; border-top: 1px solid #edf0ed; }
 .form-footer p { margin: 0; }
 .form-footer button { min-width: 145px; }
@@ -63,13 +63,18 @@ textarea { resize: vertical; min-height: 115px; }
 [hidden] { display: none !important; }
 .empty-state { border: 1px dashed #c9d6ce; border-radius: 12px; padding: 40px 22px; text-align: center; font-size: 14px; color: var(--muted); background: #ffffff70; }
 .request-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.filters { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 18px; }
+.filters button { color: var(--accent); background: white; border: 1px solid var(--border); padding: 8px 20px; }
+.filters button[aria-pressed="true"] { background: var(--accent); color: white; }
+.filters button:hover:not(:disabled) { background: #dcece5; color: #105345; }
+.status-badge { background: #eff0fc; color: #55528b; font-size: 11px; padding: 3px 9px; border-radius: 5px; }
 .request-card { background: white; border: 1px solid var(--border); border-radius: 12px; padding: 22px 26px; overflow-wrap: anywhere; }
 .request-topline { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
 .badges { display: flex; flex-wrap: wrap; gap: 7px; }
-.category-badge, .priority-badge { font-size: 11px; padding: 3px 9px; border-radius: 5px; background: #f0f2f5; color: #596778; }
-.priority-badge[data-level="低"] { background: #eaf4ed; color: #347250; }
-.priority-badge[data-level="中"] { background: #fff4de; color: #8c661e; }
-.priority-badge[data-level="高"] { background: #fcebe8; color: #a73e32; }
+.category-badge, .urgency-badge { font-size: 11px; padding: 3px 9px; border-radius: 5px; background: #f0f2f5; color: #596778; }
+.urgency-badge[data-level="低"] { background: #eaf4ed; color: #347250; }
+.urgency-badge[data-level="中"] { background: #fff4de; color: #8c661e; }
+.urgency-badge[data-level="高"] { background: #fcebe8; color: #a73e32; }
 time { font-size: 11px; color: var(--muted); }
 h3 { margin: 12px 0 6px; font-size: 16px; }
 .request-description { margin: 0 0 14px; color: #50635c; font-size: 14px; white-space: pre-wrap; }

@@ -36,7 +36,7 @@
           <div class="form-grid">
             <div class="field">
               <label for="requester-name">報修人</label>
-              <input id="requester-name" name="requester_name" autocomplete="name" maxlength="100" placeholder="請填寫姓名" required>
+              <input id="requester-name" name="reporter_name" autocomplete="name" maxlength="100" placeholder="請填寫姓名" required>
             </div>
             <div class="field">
               <label for="location">地點或部門</label>
@@ -52,12 +52,12 @@
                 <option value="其他">其他</option>
               </select>
             </div>
-            <fieldset class="field priority-field">
+            <fieldset class="field urgency-field">
               <legend>緊急程度</legend>
-              <div class="priority-options">
-                <label><input type="radio" name="priority" value="低" required><span>低</span></label>
-                <label><input type="radio" name="priority" value="中" checked><span>中</span></label>
-                <label><input type="radio" name="priority" value="高"><span>高</span></label>
+              <div class="urgency-options">
+                <label><input type="radio" name="urgency" value="低" required><span>低</span></label>
+                <label><input type="radio" name="urgency" value="中" checked><span>中</span></label>
+                <label><input type="radio" name="urgency" value="高"><span>高</span></label>
               </div>
             </fieldset>
             <div class="field full-width">
@@ -79,6 +79,12 @@
         <button id="refresh-button" class="secondary-button" type="button" disabled>重新整理</button>
       </div>
       <p class="muted list-caption">顯示最近 20 筆，依登記時間由新到舊排列。</p>
+      <div id="urgency-filters" class="filters" role="group" aria-label="依緊急程度篩選最近 20 筆">
+        <button type="button" data-filter="全部" aria-pressed="true">全部</button>
+        <button type="button" data-filter="高" aria-pressed="false">高</button>
+        <button type="button" data-filter="中" aria-pressed="false">中</button>
+        <button type="button" data-filter="低" aria-pressed="false">低</button>
+      </div>
       <div id="list-message" class="message" role="status" aria-live="polite" hidden></div>
       <p id="empty-state" class="empty-state">填入連線設定後，即可查看報修紀錄。</p>
       <ol id="request-list" class="request-list" aria-label="最近報修清單" aria-busy="false"></ol>
@@ -90,12 +96,12 @@
     <li class="request-card">
       <article>
         <div class="request-topline">
-          <div class="badges"><span class="category-badge" data-field="category"></span><span class="priority-badge" data-field="priority"></span></div>
+          <div class="badges"><span class="category-badge" data-field="category"></span><span class="urgency-badge" data-field="urgency"></span><span class="status-badge" data-field="status"></span></div>
           <time data-field="created_at"></time>
         </div>
         <h3 data-field="location"></h3>
         <p class="request-description" data-field="description"></p>
-        <p class="request-person">報修人：<span data-field="requester_name"></span></p>
+        <p class="request-person">報修人：<span data-field="reporter_name"></span></p>
       </article>
     </li>
   </template>
