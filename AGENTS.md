@@ -15,3 +15,12 @@ There is no test framework or coverage target yet. When implementing the demo, v
 ## Commits and Reviews
 
 This workspace has no Git history to establish a commit convention. If version control is added, use short, descriptive commit subjects, such as `Add repair request sample data`. In review requests, summarize the affected deliverables, explain how you verified them, and include screenshots for visible web changes. Call out changes to fields or access rules so reviewers can check all affected deliverables.
+
+## Current Delivery Rules
+
+- Start new work by fetching `origin/main` and checking differences; preserve local user edits before integrating updates.
+- Frontend fields must match `supabase/schema.sql`: `reporter_name` and `urgency`. Never send `status` when inserting from the public browser.
+- Use only publishable keys in frontend and public deployment settings. Never write secret, service_role, database passwords, or management tokens into project files. Keep local `config.js` ignored.
+- Submit changes through a PR. Keep deployment claims and live verification separate from mocked or local database tests; unresolved live setup blockers must be recorded before merging for release.
+- Use fictional test records; mutation tests must target only records created by that test. Do not delete existing business data.
+- Keep delivery documents in `文件/`, with screenshots of actual UI and an explicit statement when live verification is incomplete.

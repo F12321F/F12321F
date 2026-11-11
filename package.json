@@ -1,0 +1,16 @@
+{
+  "name": "repair-request-course-project",
+  "private": true,
+  "scripts": {
+    "preview": "node scripts/preview.cjs",
+    "build": "node scripts/build.cjs",
+    "test:db": "node tests/database.cjs",
+    "test:browser": "node tests/browser.cjs"
+  },
+  "devDependencies": {
+    "@electric-sql/pglite": "0.3.14",
+    "playwright": "1.62.1",
+    "docx": "9.6.1",
+    "pptxgenjs": "4.0.1"
+  }
+}
