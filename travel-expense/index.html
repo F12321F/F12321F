@@ -209,6 +209,18 @@ details.panel[open] > summary::after { content: "－"; }
 .rate .nm { font-size: 0.8rem; color: var(--muted); }
 .rate input { padding: 4px 8px; text-align: right; font-family: var(--font-mono); font-size: 0.85rem; }
 
+.sync-pill {
+  justify-self: start; display: inline-flex; align-items: center; gap: 6px; margin-top: 6px;
+  padding: 3px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 500;
+  background: var(--surface); border: 1px solid var(--line); color: var(--muted);
+}
+.sync-pill::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: currentColor; }
+.sync-pill.ok { color: var(--pos); }
+.sync-pill.busy { color: var(--accent); }
+.sync-pill.offline, .sync-pill.error { color: var(--neg); }
+.cloud-code { font: 600 1.35rem/1.2 var(--font-mono); letter-spacing: 0.06em; color: var(--accent); overflow-wrap: anywhere; }
+.recent { display: grid; gap: 6px; }
+.recent button { display: flex; justify-content: space-between; gap: 8px; text-align: left; width: 100%; background: var(--sunken); }
 .toast {
   position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(20px + env(safe-area-inset-bottom, 0px));
   background: var(--ink); color: var(--bg); padding: 10px 16px; border-radius: 8px; font-size: 0.9rem; z-index: 20;
@@ -251,6 +263,7 @@ details.panel[open] > summary::after { content: "－"; }
       <span class="label">總支出（新台幣）</span>
       <span id="metaTotal" class="total num">NT$ 0</span>
       <span class="small muted">外幣依每筆記錄的匯率換算</span>
+      <button id="syncPill" type="button" class="sync-pill">僅存在這台裝置</button>
     </div>
   </header>
 
@@ -310,6 +323,12 @@ details.panel[open] > summary::after { content: "－"; }
         </form>
       </section>
 
+      <details class="panel" id="cloudPanel">
+        <summary>雲端同步（Supabase）</summary>
+        <div id="cloudBody" class="stack" style="gap:12px"></div>
+        <div id="cloudErr" class="err" role="status"></div>
+      </details>
+
       <details class="panel" id="ratePanel">
         <summary>匯率設定</summary>
         <p class="small muted" style="margin:0">預設為參考匯率（1 外幣可換多少新台幣），請依實際換匯或刷卡匯率修改。修改後只會套用到之後新增的支出；舊的支出可按「編輯」個別調整。</p>
@@ -320,7 +339,7 @@ details.panel[open] > summary::after { content: "－"; }
 
       <details class="panel" id="dataPanel">
         <summary>資料備份與分享</summary>
-        <p class="small muted" style="margin:0">資料只存在這台裝置的瀏覽器中。要給旅伴或換裝置，請複製備份文字，再到對方的分帳本貼上匯入。</p>
+        <p class="small muted" style="margin:0">本機旅程的資料只存在這台裝置；雲端旅程則存在 Supabase。備份文字可用來換裝置、匯入成雲端旅程，或自己留存。</p>
         <div class="btns">
           <button id="copyJson" type="button">複製備份文字</button>
           <button id="copyCsv" type="button">複製明細（貼到 Excel）</button>
@@ -372,6 +391,7 @@ details.panel[open] > summary::after { content: "－"; }
 </div>
 <div id="toast" class="toast" hidden role="status"></div>
 
+<script src="config.js"></script>
 <script>
 (() => {
   "use strict";
@@ -463,9 +483,26 @@ details.panel[open] > summary::after { content: "－"; }
     try { const raw = localStorage.getItem(STORE_KEY); if (raw) return normalize(JSON.parse(raw)); } catch (e) { /* 無法讀取時使用範例 */ }
     return exampleState();
   }
-  function save() { try { localStorage.setItem(STORE_KEY, JSON.stringify(state)); } catch (e) { /* 私密視窗等情況 */ } }
+  function save() { try { localStorage.setItem(online() ? cacheKey() : STORE_KEY, JSON.stringify(state)); } catch (e) { /* 私密視窗等情況 */ } }
 
-  let state = load();
+  // ---------- 雲端同步（Supabase）設定 ----------
+  // 連線資訊來源：config.js（window.TRAVEL_SPLIT_CONFIG）或使用者在「雲端同步」面板輸入的值
+  const CLOUD_KEY = "travel-split-cloud-v1";
+  const lsGet = (k, d) => { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch (e) { return d; } };
+  const lsSet = (k, v) => { try { localStorage.setItem(k, JSON.stringify(v)); } catch (e) { /* 忽略 */ } };
+  let cloud = { url: "", key: "", code: "", trips: [], ...lsGet(CLOUD_KEY, {}) };
+  const saveCloud = () => lsSet(CLOUD_KEY, { url: cloud.url, key: cloud.key, code: cloud.code, trips: cloud.trips });
+  function cfg() {
+    const c = window.TRAVEL_SPLIT_CONFIG || {};
+    return { url: String(cloud.url || c.supabaseUrl || "").trim().replace(/\/+$/, ""), key: String(cloud.key || c.supabaseKey || "").trim() };
+  }
+  const cloudReady = () => { const c = cfg(); return /^https:\/\/\S+$/.test(c.url) && c.key.length > 20; };
+  const online = () => cloudReady() && !!cloud.code;
+  const cacheKey = () => "travel-split-trip-" + cloud.code;
+  const outboxKey = () => "travel-split-outbox-" + cloud.code;
+  const fmtCode = c => String(c).replace(/(.{4})(?=.)/g, "$1-");
+
+  let state = online() ? (() => { try { return normalize(lsGet(cacheKey(), null)); } catch (e) { return emptyState(); } })() : load();
   let editingId = null;
 
   // ---------- 計算 ----------
@@ -521,6 +558,7 @@ details.panel[open] > summary::after { content: "－"; }
   function render() {
     if (document.activeElement !== $("tripName")) $("tripName").value = state.tripName;
     $("exampleFlag").hidden = !state.isExample;
+    $("clearAll").hidden = online(); // 雲端旅程請用「離開此旅程」
     renderMembers(); renderPayer(); renderSplit(); renderHeader(); renderSettle(); renderList();
     save();
   }
@@ -720,7 +758,8 @@ details.panel[open] > summary::after { content: "－"; }
     const rec = { id: editingId || uid(), date: $("fDate").value || today(), desc, cat: $("fCat").value, amount, cur, rate, payer: $("fPayer").value, mode: m, split, custom };
     if (editingId) state.expenses = state.expenses.map(x => x.id === editingId ? rec : x);
     else state.expenses.push(rec);
-    if (cur !== "TWD") state.rates[cur] = rate; // 記住最近使用的匯率
+    enqueue("upsert_expense", { p_expense: rec });
+    if (cur !== "TWD" && state.rates[cur] !== rate) { state.rates[cur] = rate; enqueue("update_trip", { p_rates: state.rates }); } // 記住最近使用的匯率
     const wasEdit = !!editingId;
     resetForm(true);
     render(); renderRates();
@@ -743,6 +782,7 @@ details.panel[open] > summary::after { content: "－"; }
     if (!name) return;
     if (state.members.some(m => m.name === name)) { $("memberErr").textContent = `已經有「${name}」了。`; return; }
     state.members.push({ id: uid(), name });
+    enqueue("upsert_member", { p_id: state.members.at(-1).id, p_name: name });
     if (splitDraft.equal) splitDraft.equal.push(state.members.at(-1).id);
     $("memberName").value = "";
     render();
@@ -752,6 +792,7 @@ details.panel[open] > summary::after { content: "－"; }
     const used = state.expenses.some(e => e.payer === id || shares(e)[id] > 0);
     if (used) { $("memberErr").textContent = `${nameOf(id)} 已有相關支出，請先修改或刪除那些支出再移除。`; return; }
     state.members = state.members.filter(m => m.id !== id);
+    enqueue("delete_member", { p_id: id });
     if (splitDraft.equal) splitDraft.equal = splitDraft.equal.filter(x => x !== id);
     delete splitDraft.custom[id];
     $("memberErr").textContent = "";
@@ -764,13 +805,18 @@ details.panel[open] > summary::after { content: "－"; }
     if (t.dataset.edit) startEdit(t.dataset.edit);
     if (t.dataset.del) arm(t, "確定刪除？", () => {
       state.expenses = state.expenses.filter(e => e.id !== t.dataset.del);
+      enqueue("delete_expense", { p_id: t.dataset.del });
       if (editingId === t.dataset.del) resetForm(true);
       render(); toast("已刪除");
     });
   });
   $("filterMember").addEventListener("change", renderList);
   $("displayCur").addEventListener("change", e => { state.displayCur = e.target.value; renderSettle(); save(); });
-  $("tripName").addEventListener("input", e => { state.tripName = e.target.value.trim() || "我的旅程"; save(); });
+  let nameTimer;
+  $("tripName").addEventListener("input", e => {
+    state.tripName = e.target.value.trim() || "我的旅程"; save();
+    clearTimeout(nameTimer); nameTimer = setTimeout(() => enqueue("update_trip", { p_name: state.tripName }), 700);
+  });
   $("startFresh").addEventListener("click", e => arm(e.target, "確定清空範例？", () => { state = emptyState(); resetForm(false); render(); renderRates(); $("memberName").focus(); toast("已清空，先加入旅伴吧"); }));
 
   // 匯率
@@ -783,10 +829,10 @@ details.panel[open] > summary::after { content: "－"; }
   $("rateFilter").addEventListener("input", renderRates);
   $("rateGrid").addEventListener("change", ev => {
     const c = ev.target.dataset.rate, v = Number(ev.target.value); if (!c) return;
-    if (v > 0) { state.rates[c] = v; save(); if ($("fCur").value === c && !editingId) $("fRate").value = v; updateSplitHint(); renderSettle(); toast(`${c} 匯率已更新`); }
+    if (v > 0) { state.rates[c] = v; save(); enqueue("update_trip", { p_rates: state.rates }); if ($("fCur").value === c && !editingId) $("fRate").value = v; updateSplitHint(); renderSettle(); toast(`${c} 匯率已更新`); }
     else ev.target.value = state.rates[c];
   });
-  $("resetRates").addEventListener("click", e => arm(e.target, "確定恢復？", () => { state.rates = { ...DEFAULT_RATES }; save(); renderRates(); setCur($("fCur").value); renderSettle(); toast("已恢復預設匯率"); }));
+  $("resetRates").addEventListener("click", e => arm(e.target, "確定恢復？", () => { state.rates = { ...DEFAULT_RATES }; save(); enqueue("update_trip", { p_rates: state.rates }); renderRates(); setCur($("fCur").value); renderSettle(); toast("已恢復預設匯率"); }));
 
   // 資料
   $("copyJson").addEventListener("click", () => copy(JSON.stringify(state, null, 2), "已複製備份文字"));
@@ -805,15 +851,231 @@ details.panel[open] > summary::after { content: "－"; }
     t.forEach(x => lines.push(`${nameOf(x.from)} → ${nameOf(x.to)}：${fmt(disp(x.amt), dc)}`));
     copy(lines.join("\n"), "已複製結算結果，可貼到群組");
   });
-  $("importBtn").addEventListener("click", () => {
+  $("importBtn").addEventListener("click", async () => {
     $("dataErr").textContent = "";
-    try {
-      state = normalize(JSON.parse($("importText").value));
-      $("importText").value = "";
-      resetForm(false); render(); renderRates(); toast("匯入完成");
-    } catch (e) { $("dataErr").textContent = "無法匯入：請貼上從「複製備份文字」得到的完整內容。"; }
+    let next;
+    try { next = normalize(JSON.parse($("importText").value)); }
+    catch (e) { $("dataErr").textContent = "無法匯入：請貼上從「複製備份文字」得到的完整內容。"; return; }
+    if (online()) { // 雲端旅程：直接取代雲端上的資料，所有旅伴都會看到
+      try { setSync("busy"); applyRemote(await rpc("replace_trip", { p_code: cloud.code, p_state: next })); setSync("ok"); }
+      catch (e) { setSync(e instanceof NetError ? "offline" : "error"); $("dataErr").textContent = "匯入失敗：" + e.message; return; }
+    } else state = next;
+    $("importText").value = "";
+    resetForm(false); render(); renderRates(); toast("匯入完成");
   });
   $("clearAll").addEventListener("click", e => arm(e.target, "確定清空全部？", () => { state = emptyState(); resetForm(false); render(); renderRates(); toast("已清空全部資料"); }));
+
+  // ---------- 雲端同步（Supabase）----------
+  // 讀寫都呼叫 schema.sql 裡的函式（/rest/v1/rpc/...），並帶上分享碼。
+  // 本機先更新畫面，變更放進待上傳佇列；沒網路時保留，恢復連線後依序上傳。
+  class NetError extends Error {}
+  const ERR = {
+    TRIP_NOT_FOUND: "找不到這個分享碼的旅程，請確認是否輸入正確。",
+    MEMBER_IN_USE: "這位旅伴在雲端已有相關支出，不能移除。",
+    MEMBER_NAME_TAKEN: "雲端旅程裡已經有同名的旅伴。",
+    CUSTOM_SUM_MISMATCH: "自訂金額合計與總金額不符。",
+    UNKNOWN_MEMBER: "支出裡有不存在的旅伴，可能已被其他人移除。",
+    INVALID_SPLIT: "分攤設定不正確。",
+    INVALID_EXPENSE: "支出資料格式不正確。",
+    INVALID_MEMBER: "旅伴名字格式不正確。",
+    INVALID_RATES: "匯率資料格式不正確。",
+    TOO_MANY_MEMBERS: "一個旅程最多 50 位旅伴。",
+    TOO_MANY_EXPENSES: "一個旅程最多 3000 筆支出。"
+  };
+  async function rpc(fn, args) {
+    const { url, key } = cfg();
+    const headers = { "Content-Type": "application/json", apikey: key };
+    if (key.startsWith("eyJ")) headers.Authorization = "Bearer " + key; // 舊版 anon JWT 金鑰
+    let res;
+    try { res = await fetch(`${url}/rest/v1/rpc/${fn}`, { method: "POST", headers, body: JSON.stringify(args || {}) }); }
+    catch (e) { throw new NetError("無法連線到雲端，請檢查網路。"); }
+    const text = await res.text();
+    let body = null;
+    try { body = text ? JSON.parse(text) : null; } catch (e) { /* 非 JSON */ }
+    if (res.ok) return body;
+    const msg = (body && body.message) || "";
+    if (ERR[msg]) throw new Error(ERR[msg]);
+    if (res.status === 401 || res.status === 403) throw new Error("雲端拒絕連線：請確認金鑰正確，並已在 Supabase 執行 schema.sql。");
+    if (res.status === 404) throw new Error("雲端找不到記帳功能：請先在 Supabase 的 SQL Editor 執行 schema.sql。");
+    if (res.status >= 500 || res.status === 0) throw new NetError("雲端暫時無法回應，稍後會自動重試。");
+    throw new Error("雲端錯誤：" + (msg || res.status));
+  }
+
+  let outbox = online() ? lsGet(outboxKey(), []) : [];
+  let lastVersion = 0, syncStatus = online() ? "busy" : "local", flushing = false, showCfg = false;
+
+  function setSync(st) { syncStatus = st; renderPill(); }
+  function renderPill() {
+    const pill = $("syncPill");
+    const map = {
+      local: ["", cloudReady() ? "僅存在這台裝置，點此上傳雲端" : "僅存在這台裝置"],
+      ok: ["ok", "已同步雲端"],
+      busy: ["busy", "同步中…"],
+      offline: ["offline", outbox.length ? `離線中，${outbox.length} 筆待上傳` : "離線中"],
+      error: ["error", "同步失敗，點此查看"]
+    };
+    const [cls, text] = map[online() ? syncStatus : "local"] || map.local;
+    pill.className = "sync-pill " + cls;
+    pill.textContent = text;
+  }
+
+  function enqueue(fn, args) {
+    if (!online()) return;
+    outbox.push({ fn, args: { p_code: cloud.code, ...args } });
+    lsSet(outboxKey(), outbox);
+    flush();
+  }
+  async function flush() {
+    if (flushing || !online()) return;
+    flushing = true;
+    let needPull = false;
+    try {
+      while (outbox.length) {
+        setSync("busy");
+        const op = outbox[0];
+        try {
+          const v = await rpc(op.fn, op.args);
+          if (typeof v === "number") { if (v === lastVersion + 1) lastVersion = v; else needPull = true; }
+        } catch (e) {
+          if (e instanceof NetError) { setSync("offline"); return; }
+          toast(e.message); needPull = true; // 雲端拒絕這筆變更：丟棄並重新下載正確資料
+        }
+        outbox.shift(); lsSet(outboxKey(), outbox);
+      }
+    } finally { flushing = false; }
+    if (needPull) await pull(); else setSync("ok");
+  }
+  async function pull(silent) {
+    if (!online()) return;
+    if (outbox.length) return flush();
+    const code = cloud.code;
+    try {
+      setSync("busy");
+      const t = await rpc("get_trip", { p_code: code });
+      if (outbox.length || code !== cloud.code) return; // 下載期間有新的本機變更或已切換旅程
+      applyRemote(t); setSync("ok");
+    } catch (e) {
+      if (e instanceof NetError) setSync("offline");
+      else { setSync("error"); $("cloudErr").textContent = e.message; if (!silent) toast(e.message); }
+    }
+  }
+  async function poll() {
+    if (!online() || document.hidden || flushing) return;
+    if (outbox.length) return flush();
+    try {
+      const v = await rpc("trip_version", { p_code: cloud.code });
+      if (v !== lastVersion) await pull(true); else setSync("ok");
+    } catch (e) { setSync(e instanceof NetError ? "offline" : "error"); }
+  }
+  function applyRemote(t) {
+    state = normalize({ tripName: t.name, isExample: false, members: t.members, expenses: t.expenses, rates: t.rates, displayCur: state.displayCur });
+    lastVersion = t.version;
+    rememberTrip(t.code, t.name);
+    $("cloudErr").textContent = "";
+    render(); renderRates(); renderCloud();
+  }
+  function rememberTrip(code, name) {
+    cloud.trips = [{ code, name }, ...cloud.trips.filter(x => x.code !== code)].slice(0, 10);
+    saveCloud();
+  }
+  function switchTo(code) {
+    save(); // 先保存目前的旅程（本機或雲端快取）
+    cloud.code = code; saveCloud();
+    outbox = lsGet(outboxKey(), []);
+    lastVersion = 0;
+    resetForm(false);
+  }
+  async function joinTrip(raw) {
+    const code = String(raw || "").toUpperCase().replace(/[^0-9A-Z]/g, "");
+    if (code.length !== 12) throw new Error("分享碼是 12 個英數字，例如 1A2B-3C4D-5E6F。");
+    const t = await rpc("get_trip", { p_code: code });
+    switchTo(t.code); applyRemote(t); setSync("ok");
+    toast(`已加入「${t.name}」`);
+  }
+  async function createCloudTrip() {
+    const src = state.isExample ? { tripName: "我的旅程", members: [], expenses: [], rates: state.rates } : state;
+    const t = await rpc("create_trip", { p_state: src });
+    switchTo(t.code); applyRemote(t); setSync("ok");
+    toast("已建立雲端旅程，把分享碼傳給旅伴吧");
+  }
+  function leaveTrip() {
+    save();
+    cloud.code = ""; saveCloud();
+    outbox = [];
+    state = load();
+    resetForm(false); render(); renderRates(); renderCloud();
+    toast("已切回本機資料，雲端旅程仍保留");
+  }
+
+  function renderCloud() {
+    const body = $("cloudBody");
+    const c = cfg();
+    if (!cloudReady() || showCfg) {
+      body.innerHTML = `
+        <p class="small muted" style="margin:0">先在 Supabase 的 SQL Editor 執行 <span class="mono">supabase/schema.sql</span>，再到 Project Settings → API 複製專案網址與 anon（publishable）金鑰貼在這裡。請勿貼 service_role / secret 金鑰。</p>
+        <label class="field">Supabase 專案網址<input id="cUrl" type="text" inputmode="url" placeholder="https://xxxx.supabase.co" value="${esc(c.url)}"></label>
+        <label class="field">anon / publishable 金鑰<input id="cKey" type="text" placeholder="sb_publishable_… 或 eyJ…" value="${esc(c.key)}"></label>
+        <div class="btns"><button type="button" class="primary" data-act="saveCfg">測試並儲存</button>${cloudReady() ? `<button type="button" data-act="cancelCfg">取消</button>` : ""}</div>`;
+      renderPill(); return;
+    }
+    if (!online()) {
+      const recent = cloud.trips.length ? `<div class="recent"><span class="label">最近的雲端旅程</span>${cloud.trips.map(t =>
+        `<button type="button" data-act="open" data-code="${esc(t.code)}"><span>${esc(t.name)}</span><span class="mono small muted">${fmtCode(esc(t.code))}</span></button>`).join("")}</div>` : "";
+      body.innerHTML = `
+        <p class="small muted" style="margin:0">目前的資料只存在這台裝置。上傳到雲端後會得到一組分享碼，旅伴輸入分享碼就能一起記帳，資料會自動同步。</p>
+        <div class="btns"><button type="button" class="primary" data-act="create">${state.isExample ? "建立新的雲端旅程" : "把目前旅程上傳到雲端"}</button></div>
+        <div class="add-member"><input id="cJoin" type="text" placeholder="輸入分享碼，例如 1A2B-3C4D-5E6F" aria-label="分享碼" autocapitalize="characters"><button type="button" data-act="join">加入</button></div>
+        ${recent}
+        <div class="btns"><button type="button" class="ghost" data-act="editCfg">修改連線設定</button></div>`;
+      renderPill(); return;
+    }
+    const link = /^https?:/.test(location.protocol) && !window.Capacitor ? `${location.origin}${location.pathname}?trip=${cloud.code}` : "";
+    body.innerHTML = `
+      <div><span class="label">分享碼</span><div class="cloud-code">${fmtCode(esc(cloud.code))}</div></div>
+      <p class="small muted" style="margin:0">知道分享碼的人都能查看與編輯這個旅程，只傳給一起旅行的人。資料會自動同步，每 15 秒檢查一次旅伴的更新。</p>
+      <div class="btns">
+        <button type="button" data-act="copyCode">複製分享碼</button>
+        ${link ? `<button type="button" data-act="copyLink">複製邀請連結</button>` : ""}
+        <button type="button" data-act="syncNow">立即同步</button>
+      </div>
+      <div class="btns"><button type="button" class="danger" data-act="leave">離開此旅程</button></div>`;
+    renderPill();
+  }
+
+  $("cloudBody").addEventListener("click", async ev => {
+    const btn = ev.target.closest("button[data-act]"); if (!btn) return;
+    const act = btn.dataset.act;
+    $("cloudErr").textContent = "";
+    const busy = async fn => {
+      btn.disabled = true;
+      try { await fn(); } catch (e) { $("cloudErr").textContent = e.message; } finally { btn.disabled = false; }
+    };
+    if (act === "saveCfg") return busy(async () => {
+      const url = $("cUrl").value.trim().replace(/\/+$/, ""), key = $("cKey").value.trim();
+      if (!/^https:\/\/\S+$/.test(url)) throw new Error("專案網址要以 https:// 開頭，例如 https://xxxx.supabase.co。");
+      if (key.length <= 20) throw new Error("請貼上完整的 anon / publishable 金鑰。");
+      if (/^sb_secret_/.test(key) || /service_role/.test(atobSafe(key.split(".")[1]))) throw new Error("這是後端專用的 secret / service_role 金鑰，請改用 anon / publishable 金鑰。");
+      const prev = { url: cloud.url, key: cloud.key };
+      cloud.url = url; cloud.key = key;
+      try { await rpc("trip_version", { p_code: "000000000000" }); }
+      catch (e) { if (e.message !== ERR.TRIP_NOT_FOUND) { cloud.url = prev.url; cloud.key = prev.key; throw e; } }
+      saveCloud(); showCfg = false; renderCloud(); toast("連線成功");
+    });
+    if (act === "cancelCfg") { showCfg = false; return renderCloud(); }
+    if (act === "editCfg") { showCfg = true; return renderCloud(); }
+    if (act === "create") return busy(createCloudTrip);
+    if (act === "join") return busy(() => joinTrip($("cJoin").value));
+    if (act === "open") return busy(() => joinTrip(btn.dataset.code));
+    if (act === "copyCode") return copy(fmtCode(cloud.code), "已複製分享碼");
+    if (act === "copyLink") return copy(`${location.origin}${location.pathname}?trip=${cloud.code}`, "已複製邀請連結");
+    if (act === "syncNow") return busy(async () => { await flush(); await pull(); if (syncStatus === "ok") toast("已是最新資料"); });
+    if (act === "leave") return arm(btn, "確定離開？", leaveTrip);
+  });
+  function atobSafe(s) { try { return atob((s || "").replace(/-/g, "+").replace(/_/g, "/")); } catch (e) { return ""; } }
+  $("syncPill").addEventListener("click", () => { $("cloudPanel").open = true; $("cloudPanel").scrollIntoView({ behavior: "smooth", block: "start" }); });
+  setInterval(poll, 15000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden) poll(); });
+  window.addEventListener("online", () => { flush().then(poll); });
 
   // ---------- 初始化 ----------
   $("fCat").innerHTML = CATS.map(c => `<option>${c}</option>`).join("");
@@ -822,6 +1084,16 @@ details.panel[open] > summary::after { content: "－"; }
   resetForm(false);
   render();
   renderRates();
+  renderCloud();
+  if (online()) { $("cloudPanel").open = true; flush().then(() => pull(true)); }
+  // 邀請連結 ?trip=分享碼
+  const invite = new URLSearchParams(location.search).get("trip");
+  if (invite) {
+    try { history.replaceState(null, "", location.pathname + location.hash); } catch (e) { /* 忽略 */ }
+    $("cloudPanel").open = true;
+    if (!cloudReady()) $("cloudErr").textContent = "收到邀請連結，但這個 App 尚未設定雲端連線，請先填入 Supabase 連線資訊。";
+    else if (invite.toUpperCase().replace(/[^0-9A-Z]/g, "") !== cloud.code) joinTrip(invite).catch(e => { $("cloudErr").textContent = e.message; });
+  }
 })();
 </script>
 <!-- ARTIFACT-END -->
