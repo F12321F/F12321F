@@ -4,6 +4,7 @@
 
 This repository holds 旅行分帳本, a travel expense sharing app.
 
+- `index.html` (repo root): redirects the GitHub Pages root URL to `travel-expense/`.
 - `travel-expense/index.html`: the whole app (HTML, CSS, JS in one file), shared by the web, PWA, and Android builds.
 - `travel-expense/manifest.webmanifest`, `sw.js`, `icons/`: PWA install and offline cache.
 - `travel-expense/app/`: Capacitor Android project. `scripts/copy-web.mjs` copies the web files into `www/`; `assets/` holds icon and splash sources.
