@@ -1,0 +1,21 @@
+{
+  "name": "travel-split-app",
+  "private": true,
+  "version": "1.0.0",
+  "description": "旅行分帳本 Android App（Capacitor 包裝 ../index.html）",
+  "type": "module",
+  "scripts": {
+    "build:web": "node scripts/copy-web.mjs",
+    "android:init": "npm run build:web && npx cap add android && npx capacitor-assets generate --android",
+    "android:sync": "npm run build:web && npx cap sync android",
+    "android:apk": "npm run android:sync && cd android && ./gradlew assembleDebug"
+  },
+  "dependencies": {
+    "@capacitor/android": "8.4.3",
+    "@capacitor/core": "8.4.3"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "3.0.5",
+    "@capacitor/cli": "8.4.3"
+  }
+}

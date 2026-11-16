@@ -1,0 +1,8 @@
+{
+  "appId": "app.travelsplit.ledger",
+  "appName": "旅行分帳本",
+  "webDir": "www",
+  "android": {
+    "backgroundColor": "#EEF1F5"
+  }
+}
