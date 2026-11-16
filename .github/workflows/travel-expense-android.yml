@@ -1,0 +1,68 @@
+name: 旅行分帳本 Android APK
+
+on:
+  push:
+    paths:
+      - "travel-expense/**"
+      - ".github/workflows/travel-expense-android.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: travel-expense-android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: travel-expense/app
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: travel-expense/app/package-lock.json
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Copy web app into Android project
+        run: npm run android:sync
+
+      - name: Build debug APK
+        working-directory: travel-expense/app/android
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleDebug --no-daemon
+          cp app/build/outputs/apk/debug/app-debug.apk "$GITHUB_WORKSPACE/travel-split.apk"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: travel-split-apk
+          path: travel-split.apk
+
+      - name: Publish to the "travel-split-latest" pre-release (download on phone)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        working-directory: ${{ github.workspace }}
+        run: |
+          TAG=travel-split-latest
+          NOTES="旅行分帳本 Android 測試版（debug 簽章）。在 Android 手機上下載 travel-split.apk 安裝即可。來源：${GITHUB_REF_NAME} @ ${GITHUB_SHA::7}"
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" travel-split.apk --clobber
+            gh release edit "$TAG" --notes "$NOTES"
+          else
+            gh release create "$TAG" travel-split.apk --prerelease --target "$GITHUB_SHA" --title "旅行分帳本 Android 測試版" --notes "$NOTES"
+          fi

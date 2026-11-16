@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1D5BC0">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="分帳本">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icons/favicon-64.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <!-- ARTIFACT-START -->
 <title>旅行分帳本</title>
 <meta name="claude:viewport-fit-sides" content="cover">
@@ -42,6 +50,10 @@
   --line: #283447; --accent: #6FA3F2; --accent-ink: #0B1626; --accent-soft: #1A2B46;
   --pos: #5CC890; --pos-soft: #12301F; --neg: #F27C70; --neg-soft: #3A1A17;
   color-scheme: dark;
+}
+:root {
+  padding-top: max(env(safe-area-inset-top, 0px), var(--safe-area-inset-top, 0px));
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), var(--safe-area-inset-bottom, 0px));
 }
 *, *::before, *::after { box-sizing: border-box; }
 [hidden] { display: none !important; }
@@ -813,5 +825,11 @@ details.panel[open] > summary::after { content: "－"; }
 })();
 </script>
 <!-- ARTIFACT-END -->
+<script>
+// 離線使用：網頁版註冊 service worker；原生 App（Capacitor）內不需要
+if ("serviceWorker" in navigator && !window.Capacitor && /^https:|^http:\/\/localhost/.test(location.href)) {
+  window.addEventListener("load", () => navigator.serviceWorker.register("sw.js").catch(() => {}));
+}
+</script>
 </body>
 </html>
