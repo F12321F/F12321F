@@ -2,16 +2,26 @@
 
 ## Project Structure
 
-This workspace is at the requirements stage for a demo repair request tracker. Start with `報修需求筆記.txt` in the root. It records the fields, workflow, access rules, and planned deliverables: an Excel field list with sample data, a six-slide PowerPoint proposal, a Word user guide, a web form and request list, and a Supabase schema with access policies. There are no source, test, or asset directories yet. When adding a deliverable, document its location and how to use it.
+This repository holds 旅行分帳本, a travel expense sharing app.
 
-## Development and Style
+- `travel-expense/index.html`: the whole app (HTML, CSS, JS in one file), shared by the web, PWA, and Android builds.
+- `travel-expense/manifest.webmanifest`, `sw.js`, `icons/`: PWA install and offline cache.
+- `travel-expense/app/`: Capacitor Android project. `scripts/copy-web.mjs` copies the web files into `www/`; `assets/` holds icon and splash sources.
+- `.github/workflows/travel-expense-android.yml`: builds a debug APK on push and updates the `travel-split-latest` pre-release.
 
-There are no build, run, lint, or test commands yet. To read the requirements in PowerShell, run `Get-Content -LiteralPath '報修需求筆記.txt' -Encoding utf8`. When introducing runnable code, document setup, required configuration, and the commands to run and verify it. Keep field labels and allowed values consistent across the form, sample data, and documentation. Preserve the Traditional Chinese labels used in the requirements.
+Document any new deliverable's location and usage in `travel-expense/README.md`.
 
-## Testing and Data Safety
+## Development
 
-There is no test framework or coverage target yet. When implementing the demo, verify that a visitor can submit a fictional request and read it in the list, and that the system generates the registration timestamp. Verify that requests made with the public Supabase key cannot update or delete records. Enable row-level security and keep privileged keys out of browser code and shared files. Use fictional names and locations in all examples. Login, status editing, and notifications are outside the current demo scope.
+- Web: open `travel-expense/index.html` directly, or serve the folder (`python3 -m http.server`) to test the service worker.
+- Android (Node 22, JDK 21, Android SDK): `cd travel-expense/app && npm ci && npm run android:apk`. After editing `index.html`, run `npm run android:sync`.
+- Keep Traditional Chinese UI labels. TWD stays the default currency; each expense stores its own exchange rate.
+- Data lives in browser `localStorage` (key `travel-split-ledger-v1`). If the stored shape changes, keep `normalize()` able to read older backups.
+
+## Testing
+
+No test framework yet. Before committing, verify in a browser: add members, add TWD and foreign-currency expenses (equal and custom split), confirm totals and settlement transfers, reload to confirm persistence, and check a 390px-wide viewport in light and dark mode. Use fictional names in sample data.
 
 ## Commits and Reviews
 
-This workspace has no Git history to establish a commit convention. If version control is added, use short, descriptive commit subjects, such as `Add repair request sample data`. In review requests, summarize the affected deliverables, explain how you verified them, and include screenshots for visible web changes. Call out changes to fields or access rules so reviewers can check all affected deliverables.
+Use short, descriptive commit subjects, such as `Add expense category filter`. In review requests, summarize the change, explain how you verified it, and include screenshots for visible UI changes.
