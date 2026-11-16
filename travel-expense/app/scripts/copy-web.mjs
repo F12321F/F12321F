@@ -8,5 +8,5 @@ const src = dirname(app);
 const www = join(app, "www");
 rmSync(www, { recursive: true, force: true });
 mkdirSync(www, { recursive: true });
-for (const f of ["index.html", "manifest.webmanifest", "icons"]) cpSync(join(src, f), join(www, f), { recursive: true });
+for (const f of ["index.html", "config.js", "manifest.webmanifest", "icons"]) cpSync(join(src, f), join(www, f), { recursive: true });
 console.log("已複製網頁到", www);
