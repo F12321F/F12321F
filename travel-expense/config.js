@@ -4,6 +4,6 @@
 // 絕對不要填 service_role / secret 金鑰。
 // 留空時，使用者也可以在 App 的「雲端同步」面板自行輸入。
 window.TRAVEL_SPLIT_CONFIG = {
-  supabaseUrl: "",
-  supabaseKey: ""
+  supabaseUrl: "https://lnjbtvieltzhhcxzuruk.supabase.co",
+  supabaseKey: "sb_publishable_dsufs3Z9ItMTA74VYjVeOg_qFTLhiTF"
 };
